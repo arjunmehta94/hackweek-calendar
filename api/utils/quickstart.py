@@ -20,7 +20,7 @@ except ImportError:
 
 # If modifying these scopes, delete your previously saved credentials
 # at ~/.credentials/calendar-python-quickstart.json
-SCOPES = 'https://www.googleapis.com/auth/calendar'
+SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/admin.directory.resource.calendar'
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Google Calendar API Python Quickstart'
 
@@ -75,9 +75,11 @@ def parse_request(r):
     tz = r.get('tz')
     params['timeMin'] = timezone(tz).localize(datetime.datetime.combine(date, start_time)).isoformat()
     params['timeMax'] = timezone(tz).localize(datetime.datetime.combine(date, end_time)).isoformat()
+    print("Parsed params are: ", params)
     return params
 
 def find_free_time(result, duration):
+    print("Result is ", result)
     calendars = result['calendars']
     time_min = parser.parse(result['timeMin'])
     time_max = parser.parse(result['timeMax'])
@@ -97,7 +99,6 @@ def find_free_time(result, duration):
             if (start_interval + timedelta(hours=duration)) <= end_interval:
                 return [start_interval, start_interval + timedelta(hours=duration)]
     return None
-
 
 def _collapse_overlapping_intervals(intervals):
     sorted_by_lower_bound = sorted(intervals, key=lambda tup: tup[0])
