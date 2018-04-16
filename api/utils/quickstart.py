@@ -11,6 +11,7 @@ import datetime
 from datetime import timedelta
 from dateutil import parser
 from pytz import timezone
+import re
 
 try:
     import argparse
@@ -86,6 +87,7 @@ def find_free_time(result, duration=60):
     busy_array = [[parser.parse(x['start']), parser.parse(x['end'])] for x in all_busy_times]
     busy_array = _collapse_overlapping_intervals(busy_array)
     last_end = busy_array[-1][-1] if busy_array else None
+    #import ipdb; ipdb.set_trace()
     start_interval, end_interval = time_min, time_max
     if not last_end:
         return [start_interval, start_interval + timedelta(minutes=duration)]
@@ -122,3 +124,31 @@ def parse_duration(duration):
         return int(duration[:-1]) * 60
     elif duration[-1].lower() == 'm':
         return int(duration[:-1])
+
+def _process_capacities(resources, num_people):
+    capacity_regex = re.compile('\((\d+)\)$')
+    new_resources = []
+    for resource in resources:
+        if 'capacity' not in resource:
+            if capacity_regex.search(resource['resourceName']):
+                capacity = int(capacity_regex.search(resource['resourceName']).group(1))
+                resource['capacity'] = capacity
+            else:
+                resource['capacity'] = 100
+        if resource['capacity'] >= num_people:
+            new_resources.append(resource)
+
+    return sorted(new_resources, key=lambda d: d['capacity'])
+
+def process_resources(resources, rooms, num_people):
+    bostonCondition = lambda name: re.compile('180 Canal Street').search(name)
+    berlinCondition = lambda name: re.compile('Berlin').search(name)
+    sfCondition = lambda name: not bostonCondition(name) and not berlinCondition(name)
+    if rooms == 'SF':
+        r = [resource for resource in resources if sfCondition(resource['generatedResourceName'])]
+    elif rooms == 'BOS':
+        r = [resource for resource in resources if bostonCondition(resource['generatedResourceName'])]
+    elif rooms == 'BER':
+        r = [resource for resource in resources if berlinCondition(resource['generatedResourceName'])]
+    return _process_capacities(r, num_people)
+

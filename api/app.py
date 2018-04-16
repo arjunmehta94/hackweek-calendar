@@ -8,6 +8,7 @@ from utils.quickstart import get_credentials
 from utils.quickstart import parse_request
 from utils.quickstart import parse_duration
 from utils.quickstart import find_free_time
+from utils.quickstart import process_resources
 import httplib2
 from apiclient import discovery
 import datetime
@@ -45,10 +46,15 @@ def create_event():
   additional_args = request.json.get('additional_args', {})
   is_free_time = False
   if 'rooms' in additional_args:
+    rooms = additional_args['rooms']
+    if rooms not in ['SF', 'BOS', 'BER']:
+      return "Please search with correct rooms"
     resourceResult = resourceService.resources().calendars().list(
           customer='my_customer').execute()
     resources = resourceResult.get('items', [])
-    params['items'].append({'id': resources[0]['resourceEmail']})
+    if not resources:
+      return "Please search without rooms"
+    resources = process_resources(resources, additional_args['rooms'], len(params['items']))
     try:
         for resource in resources:
             params['items'].append({'id': resources[0]['resourceEmail']})
@@ -63,13 +69,17 @@ def create_event():
     if not is_free_time:
         return "No free time"
   else:
+    print('in here')
     try:
       result = calendarService.freebusy().query(body=params).execute()
     except Exception as error:
       abort(jsonify(message=str(error)))
     free_times = find_free_time(result, duration)
-    if not free_times:
-      return "No free time"
+    print(free_times)
+    if free_times:
+      is_free_time = True
+  if not is_free_time:
+        return "No free time"
   start_time, end_time = free_times[0].isoformat(), free_times[1].isoformat()
   attendees = [ {"email": email['id']} for email in params['items']]
   args = {
@@ -82,7 +92,7 @@ def create_event():
     'attendees': attendees
   }
   args.update(additional_args)
-  event = service.events().insert(calendarId='primary', body=args).execute()
+  event = calendarService.events().insert(calendarId='primary', body=args).execute()
   return jsonify(event)
 
 if __name__ == '__main__':
