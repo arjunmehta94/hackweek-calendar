@@ -78,8 +78,7 @@ def parse_request(r):
     print("Parsed params are: ", params)
     return params
 
-def find_free_time(result, duration):
-    print("Result is ", result)
+def find_free_time(result, duration=60):
     calendars = result['calendars']
     time_min = parser.parse(result['timeMin'])
     time_max = parser.parse(result['timeMax'])
@@ -89,15 +88,15 @@ def find_free_time(result, duration):
     last_end = busy_array[-1][-1] if busy_array else None
     start_interval, end_interval = time_min, time_max
     if not last_end:
-        return [start_interval, start_interval + timedelta(hours=duration)]
+        return [start_interval, start_interval + timedelta(minutes=duration)]
     for busy in busy_array:
         tmp_start, tmp_end = busy[0], busy[1]
-        if tmp_start > start_interval and (start_interval + timedelta(hours=duration)) <= tmp_start:
-            return [start_interval, start_interval + timedelta(hours=duration)]
+        if tmp_start > start_interval and (start_interval + timedelta(minutes=duration)) <= tmp_start:
+            return [start_interval, start_interval + timedelta(minutes=duration)]
         start_interval = tmp_end
         if tmp_end == last_end:
-            if (start_interval + timedelta(hours=duration)) <= end_interval:
-                return [start_interval, start_interval + timedelta(hours=duration)]
+            if (start_interval + timedelta(minutes=duration)) <= end_interval:
+                return [start_interval, start_interval + timedelta(minutes=duration)]
     return None
 
 def _collapse_overlapping_intervals(intervals):
@@ -117,3 +116,9 @@ def _collapse_overlapping_intervals(intervals):
             else:
                 merged.append(higher)
     return merged
+
+def parse_duration(duration):
+    if duration[-1].lower() == 'h':
+        return int(duration[:-1]) * 60
+    elif duration[-1].lower() == 'm':
+        return int(duration[:-1])

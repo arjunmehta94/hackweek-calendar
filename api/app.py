@@ -6,6 +6,7 @@ from flask import request
 from flask import jsonify
 from utils.quickstart import get_credentials
 from utils.quickstart import parse_request
+from utils.quickstart import parse_duration
 from utils.quickstart import find_free_time
 import httplib2
 from apiclient import discovery
@@ -39,11 +40,13 @@ def index():
 
 @app.route('/calendar/create', methods=['POST'])
 def create_event():
-    duration = int(request.json.get('duration', '1'))
-    params = parse_request(request.json)
-    is_free_time = False
+  duration = parse_duration(request.json.get('duration', '1h'))
+  params = parse_request(request.json)
+  additional_args = request.json.get('additional_args', {})
+  is_free_time = False
+  if 'rooms' in additional_args:
     resourceResult = resourceService.resources().calendars().list(
-        customer='my_customer', orderBy='capacity').execute()
+          customer='my_customer').execute()
     resources = resourceResult.get('items', [])
     params['items'].append({'id': resources[0]['resourceEmail']})
     try:
@@ -59,18 +62,28 @@ def create_event():
         abort(jsonify(message=str(error)))
     if not is_free_time:
         return "No free time"
-    start_time, end_time = free_times[0].isoformat(), free_times[1].isoformat()
-    attendees = [{"email": email['id']} for email in params['items']]
-    event = calendarService.events().insert(calendarId='primary', body={
-        'start': {
-            'dateTime': start_time
-        },
-        'end': {
-            'dateTime': end_time
-        },
-        'attendees': attendees
-    }).execute()
-    return jsonify(event)
+  else:
+    try:
+      result = calendarService.freebusy().query(body=params).execute()
+    except Exception as error:
+      abort(jsonify(message=str(error)))
+    free_times = find_free_time(result, duration)
+    if not free_times:
+      return "No free time"
+  start_time, end_time = free_times[0].isoformat(), free_times[1].isoformat()
+  attendees = [ {"email": email['id']} for email in params['items']]
+  args = {
+    'start': {
+      'dateTime': start_time
+    },
+    'end': {
+      'dateTime': end_time
+    },
+    'attendees': attendees
+  }
+  args.update(additional_args)
+  event = service.events().insert(calendarId='primary', body=args).execute()
+  return jsonify(event)
 
 if __name__ == '__main__':
     credentials = get_credentials()
